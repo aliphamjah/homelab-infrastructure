@@ -1,0 +1,17 @@
+# Ignore all data files
+*
+
+# But keep directory structure
+!.gitignore
+!.gitkeep
+!README.md
+
+# Keep backup directory structure
+!backups/
+!backups/.gitkeep
+!backups/daily/
+!backups/daily/.gitkeep
+!backups/weekly/
+!backups/weekly/.gitkeep
+!backups/monthly/
+!backups/monthly/.gitkeep
