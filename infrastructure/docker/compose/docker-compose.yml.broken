@@ -1,4 +1,6 @@
-
+# ============================================
+# DOCKER NETWORKS
+# ============================================
 networks:
   dev-network:
     external: true
@@ -7,6 +9,9 @@ networks:
   monitoring-network:
     external: true
 
+# ============================================
+# DOCKER VOLUMES
+# ============================================
 volumes:
   postgres-data:
     driver: local
@@ -14,14 +19,15 @@ volumes:
     driver: local
   pgadmin-data:
     driver: local
-  mongo-data:
-    driver: local
-  kafka-data:
-    driver: local
 
+# ============================================
+# SERVICES
+# ============================================
 services:
   
+  # ==========================================
   # PostgreSQL 16
+  # ==========================================
   postgres:
     image: postgres:16-alpine
     container_name: dev-postgres
@@ -52,7 +58,9 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # ==========================================
   # Redis 7
+  # ==========================================
   redis:
     image: redis:7-alpine
     container_name: dev-redis
@@ -79,7 +87,9 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # pgAdmin 4
+  # ==========================================
+  # pgAdmin 4 (PostgreSQL Management UI)
+  # ==========================================
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: dev-pgadmin
@@ -108,7 +118,9 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Redis Commander
+  # ==========================================
+  # Redis Commander (Redis Management UI)
+  # ==========================================
   redis-commander:
     image: rediscommander/redis-commander:latest
     container_name: dev-redis-commander
@@ -132,7 +144,9 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # MongoDB 7
+  # ==========================================
+  # MongoDB (Backend & Fullstack profiles)
+  # ==========================================
   mongodb:
     image: mongo:7
     container_name: dev-mongo
@@ -160,7 +174,9 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Mongo Express
+  # ==========================================
+  # Mongo Express (MongoDB UI)
+  # ==========================================
   mongo-express:
     image: mongo-express:latest
     container_name: dev-mongo-express
@@ -186,7 +202,9 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Kafka
+  # ==========================================
+  # Kafka (Backend & Fullstack profiles)
+  # ==========================================
   kafka:
     image: confluentinc/cp-kafka:latest
     container_name: dev-kafka
@@ -222,7 +240,9 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Kafka UI
+  # ==========================================
+  # Kafka UI (Kafka Management)
+  # ==========================================
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: dev-kafka-ui
@@ -246,7 +266,9 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Nginx
+  # ==========================================
+  # Nginx (Fullstack profile)
+  # ==========================================
   nginx:
     image: nginx:alpine
     container_name: dev-nginx
@@ -257,9 +279,22 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    volumes:
+      - ../../configs/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../../configs/nginx/conf.d:/etc/nginx/conf.d:ro
     restart: unless-stopped
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
+
+# ==========================================
+# Additional Volumes
+# ==========================================
+volumes:
+  mongo-data:
+    driver: local
+  kafka-data:
+    driver: local
+
