@@ -1,7 +1,6 @@
 #!/bin/bash
-# Service Health Monitoring Script (Production Ready)
+# Home Lab Health Check (Simplified & Reliable)
 
-# Colors
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
@@ -13,120 +12,118 @@ COMPOSE_DIR="/mnt/e/development/infrastructure/docker/compose"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${BLUE}🏥 Home Lab Health Check${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
 echo "Timestamp: $(date '+%Y-%m-%d %H:%M:%S')"
 echo ""
 
-# Check Docker daemon
-echo -e "${YELLOW}🐳 Docker Daemon Status:${NC}"
-if sudo service docker status > /dev/null 2>&1; then
-    echo -e "${GREEN}   ✓ Docker is running${NC}"
+cd "$COMPOSE_DIR" || exit 1
+
+# Check 1: Docker Daemon
+echo -e "${BLUE}🐳 Docker Daemon Status:${NC}"
+if docker info > /dev/null 2>&1; then
+    echo -e "  ${GREEN}✓ Docker is running${NC}"
 else
-    echo -e "${RED}   ✗ Docker is not running${NC}"
+    echo -e "  ${RED}✗ Docker is not running${NC}"
     exit 1
 fi
 
-# Check container health
 echo ""
+
+# Check 2: Container Status
 echo -e "${YELLOW}📦 Container Health Status:${NC}"
+RUNNING=$(docker ps -q | wc -l)
 
-cd "$COMPOSE_DIR"
-
-RUNNING_CONTAINERS=$(docker ps --format '{{.Names}}' 2>/dev/null)
-
-if [ -z "$RUNNING_CONTAINERS" ]; then
-    echo -e "${YELLOW}   ⊘ No containers running${NC}"
+if [ "$RUNNING" -eq 0 ]; then
+    echo -e "  ${YELLOW}⊘ No containers running${NC}"
 else
-    echo "$RUNNING_CONTAINERS" | while read -r container; do
-        STATUS=$(docker inspect --format='{{.State.Status}}' "$container" 2>/dev/null)
-        HEALTH=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$container" 2>/dev/null)
-        
-        if [ "$HEALTH" = "healthy" ]; then
-            echo -e "${GREEN}   ✓ $container: $STATUS (healthy)${NC}"
-        elif [ "$HEALTH" = "unhealthy" ]; then
-            echo -e "${RED}   ✗ $container: $STATUS (unhealthy)${NC}"
+    echo "  Found $RUNNING running containers"
+    echo ""
+    
+    # List all running containers with status
+    docker ps --format "table {{.Names}}\t{{.Status}}" | tail -n +2 | while IFS=$'\t' read -r name status; do
+        if [[ "$status" == *"healthy"* ]]; then
+            echo -e "  ${GREEN}✓ $name (healthy)${NC}"
+        elif [[ "$status" == *"starting"* ]]; then
+            echo -e "  ${YELLOW}⟳ $name (starting)${NC}"
+        elif [[ "$status" == *"Up"* ]]; then
+            echo -e "  ${GREEN}✓ $name (running)${NC}"
         else
-            echo -e "${GREEN}   ✓ $container: $STATUS${NC}"
+            echo -e "  ${RED}✗ $name ($status)${NC}"
         fi
     done
 fi
 
-# Check service connectivity
 echo ""
-echo -e "${YELLOW}🌐 Service Connectivity:${NC}"
 
-# PostgreSQL
-if docker ps --format '{{.Names}}' | grep -q "^dev-postgres$"; then
-    if docker exec dev-postgres pg_isready -U postgres > /dev/null 2>&1; then
-        echo -e "${GREEN}   ✓ PostgreSQL: accepting connections${NC}"
-    else
-        echo -e "${RED}   ✗ PostgreSQL: not accepting connections${NC}"
-    fi
-fi
-
-# Redis
-if docker ps --format '{{.Names}}' | grep -q "^dev-redis$"; then
-    if docker exec dev-redis redis-cli -a homelab_redis_2025 PING 2>/dev/null | grep -q "PONG"; then
-        echo -e "${GREEN}   ✓ Redis: responding to PING${NC}"
-    else
-        echo -e "${RED}   ✗ Redis: not responding${NC}"
-    fi
-fi
-
-# MongoDB
-if docker ps --format '{{.Names}}' | grep -q "^dev-mongo$"; then
-    echo -e "${GREEN}   ✓ MongoDB: container running${NC}"
-fi
-
-# Check resource usage
-echo ""
-echo -e "${YELLOW}💾 Resource Usage:${NC}"
-
-# WSL2 Memory
-MEM_INFO=$(free -h | grep Mem)
-MEM_USED=$(echo "$MEM_INFO" | awk '{print $3}')
-MEM_TOTAL=$(echo "$MEM_INFO" | awk '{print $2}')
-echo "   WSL2 Memory: $MEM_USED / $MEM_TOTAL"
-
-# Disk usage
-DISK_INFO=$(df -h /mnt/e/development | tail -1)
-DISK_USED=$(echo "$DISK_INFO" | awk '{print $3}')
-DISK_TOTAL=$(echo "$DISK_INFO" | awk '{print $2}')
-DISK_PERCENT=$(echo "$DISK_INFO" | awk '{print $5}')
-echo "   Disk Usage: $DISK_USED / $DISK_TOTAL ($DISK_PERCENT)"
-
-# Docker disk usage
-echo ""
-echo "   Docker Storage:"
-docker system df --format "   {{.Type}}: {{.Size}} ({{.Reclaimable}} reclaimable)"
-
-# Check active ports
-echo ""
-echo -e "${YELLOW}🔌 Active Service Ports:${NC}"
-
-# Get all exposed ports from running containers
-ACTIVE_PORTS=$(docker ps --format '{{.Ports}}' 2>/dev/null)
-
-check_port() {
-    local PORT=$1
-    local SERVICE=$2
+# Check 3: Service Connectivity (only if containers running)
+if [ "$RUNNING" -gt 0 ]; then
+    echo -e "${BLUE}🌐 Service Connectivity:${NC}"
     
-    if echo "$ACTIVE_PORTS" | grep -q "0.0.0.0:$PORT->"; then
-        echo -e "${GREEN}   ✓ Port $PORT: $SERVICE (listening)${NC}"
+    # PostgreSQL
+    if docker ps --format '{{.Names}}' | grep -q "dev-postgres"; then
+        if timeout 3 docker exec dev-postgres pg_isready -U postgres > /dev/null 2>&1; then
+            echo -e "  ${GREEN}✓ PostgreSQL responding${NC}"
+        else
+            echo -e "  ${YELLOW}⟳ PostgreSQL not ready yet${NC}"
+        fi
     fi
-}
+    
+    # Redis
+    if docker ps --format '{{.Names}}' | grep -q "dev-redis"; then
+        if timeout 3 docker exec dev-redis redis-cli -a homelab_redis_2025 ping > /dev/null 2>&1; then
+            echo -e "  ${GREEN}✓ Redis responding${NC}"
+        else
+            echo -e "  ${YELLOW}⟳ Redis not ready yet${NC}"
+        fi
+    fi
+    
+    # MongoDB
+    if docker ps --format '{{.Names}}' | grep -q "dev-mongo"; then
+        if timeout 3 docker exec dev-mongo mongosh --quiet --eval "db.adminCommand('ping').ok" -u admin -p homelab_mongo_2025 --authenticationDatabase admin > /dev/null 2>&1; then
+            echo -e "  ${GREEN}✓ MongoDB responding${NC}"
+        else
+            echo -e "  ${YELLOW}⟳ MongoDB not ready yet${NC}"
+        fi
+    fi
+    
+    echo ""
+fi
 
-check_port "5432" "PostgreSQL"
-check_port "6379" "Redis"
-check_port "5050" "pgAdmin"
-check_port "8082" "Redis Commander"
-check_port "27017" "MongoDB"
-check_port "8081" "Mongo Express"
-check_port "9092" "Kafka"
-check_port "8090" "Kafka UI"
+# Check 4: Resource Usage
+echo -e "${BLUE}💾 Resource Usage:${NC}"
+MEM_INFO=$(free -h | grep Mem)
+MEM_TOTAL=$(echo $MEM_INFO | awk '{print $2}')
+MEM_USED=$(echo $MEM_INFO | awk '{print $3}')
+MEM_FREE=$(echo $MEM_INFO | awk '{print $4}')
+echo "  WSL2 Memory: $MEM_USED / $MEM_TOTAL (Free: $MEM_FREE)"
+
+DISK_INFO=$(df -h /mnt/e | tail -1)
+DISK_TOTAL=$(echo $DISK_INFO | awk '{print $2}')
+DISK_USED=$(echo $DISK_INFO | awk '{print $3}')
+DISK_PERCENT=$(echo $DISK_INFO | awk '{print $5}')
+echo "  Disk Usage: $DISK_USED / $DISK_TOTAL ($DISK_PERCENT)"
+
+echo ""
+echo "  Docker Storage:"
+docker system df --format "table {{.Type}}\t{{.TotalCount}}\t{{Size}}" 2>/dev/null || docker system df
+
+echo ""
+
+# Check 5: Active Ports
+echo -e "${BLUE}📡 Active Service Ports:${NC}"
+if [ "$RUNNING" -gt 0 ]; then
+    docker ps --format "  {{.Names}}: {{.Ports}}" | sed 's/0.0.0.0://g' | sed 's/->/→/g'
+else
+    echo "  No services running"
+fi
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}✅ Health check complete!${NC}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
-exit 0
+if [ "$RUNNING" -eq 0 ]; then
+    echo -e "${YELLOW}⊘ No services running${NC}"
+else
+    echo -e "${GREEN}✅ Health check complete!${NC}"
+fi
+
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"

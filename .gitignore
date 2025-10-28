@@ -1,72 +1,139 @@
-# Secrets & Credentials
+# ═══════════════════════════════════════════════════════════
+# HOME LAB .gitignore
+# ═══════════════════════════════════════════════════════════
+
+# ─────────────────────────────────────────────────────────────
+# SECRETS & CREDENTIALS (NEVER COMMIT!)
+# ─────────────────────────────────────────────────────────────
 infrastructure/secrets/
-*.env
-.env.*
+infrastructure/secrets/*
+**/.env
+**/.env.*
+.env
+.env.local
+.env.production
+.env.*.local
 CREDENTIALS.md
+**/credentials.txt
+**/passwords.txt
+**/*secret*
+**/*password*
+**/*credential*
 
-# Data & Backups
+# SSH Keys
+*.pem
+*.key
+id_rsa
+id_rsa.pub
+*.ppk
+
+# ─────────────────────────────────────────────────────────────
+# DATA & DATABASES (Too large, not code)
+# ─────────────────────────────────────────────────────────────
 data/
+data/*
+**/data/postgres/
+**/data/mongo/
+**/data/redis/
+**/data/elasticsearch/
+**/data/backups/
 *.sql
-*.sql.gz
-*.rdb
-*.rdb.gz
-*.tar.gz
-backups/
+*.dump
+*.backup
 
-# Logs
+# ─────────────────────────────────────────────────────────────
+# DOCKER VOLUMES & BUILD
+# ─────────────────────────────────────────────────────────────
+infrastructure/docker/volumes/
+**/volumes/
+*.vhdx
+*.vhd
+
+# ─────────────────────────────────────────────────────────────
+# LOGS
+# ─────────────────────────────────────────────────────────────
 *.log
 logs/
-
-# Docker volumes (handled by Docker)
-infrastructure/docker/volumes/
-
-# Temporary files
-tmp/
-temp/
-*.tmp
-*.swp
-*.swo
-*~
-
-# OS files
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# IDE
-.vscode/
-.idea/
-*.sublime-*
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-venv/
-env/
-
-# Node
-node_modules/
+**/logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Go
+# ─────────────────────────────────────────────────────────────
+# OS & EDITOR
+# ─────────────────────────────────────────────────────────────
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+
+# VSCode
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# ─────────────────────────────────────────────────────────────
+# TEMPORARY FILES
+# ─────────────────────────────────────────────────────────────
+tmp/
+temp/
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# ─────────────────────────────────────────────────────────────
+# DEPENDENCIES (Too large, can be reinstalled)
+# ─────────────────────────────────────────────────────────────
+node_modules/
+vendor/
+bower_components/
+__pycache__/
+*.pyc
+*.pyo
+.Python
+venv/
+ENV/
+env/
+
+# ─────────────────────────────────────────────────────────────
+# BUILD OUTPUTS
+# ─────────────────────────────────────────────────────────────
+dist/
+build/
 *.exe
-*.exe~
-*.dll
+*.out
+*.o
 *.so
 *.dylib
-*.test
-*.out
-go.work
+*.dll
 
-# Rust
-target/
-Cargo.lock
+# ─────────────────────────────────────────────────────────────
+# PERSONAL NOTES (Optional, keep private)
+# ─────────────────────────────────────────────────────────────
+NOTES.md
+TODO-PERSONAL.md
+BRAINSTORM.md
 
-# Docker
-.dockerignore
-docker-compose.override.yml
+# ═══════════════════════════════════════════════════════════
+# END OF .gitignore
+# ═══════════════════════════════════════════════════════════
