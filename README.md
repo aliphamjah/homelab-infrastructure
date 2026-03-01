@@ -331,6 +331,81 @@ docker system df -v
 
 ---
 
+## 🗂️ Project Submodules
+
+Setiap project di-manage sebagai git submodule — repo terpisah, history terpisah, tapi terintegrasi di infra repo ini.
+
+### Registered Submodules
+
+| Project | Path | Remote |
+|---------|------|--------|
+| Laravel Company Employee Management | `projects/php/laravel-company-employee-management` | [gitlab.com/aliphamjah](https://gitlab.com/aliphamjah/laravel-company-employee-management) |
+| QR PDF Service | `projects/qr-pdf-service` | [github.com/aliphamjah](https://github.com/aliphamjah/visitor-id-pdf-service) |
+
+### Clone dengan Semua Submodules
+
+```bash
+# Clone + init semua submodule sekaligus
+git clone --recurse-submodules git@github.com:aliphamjah/homelab-infrastructure.git
+
+# Atau jika sudah clone tanpa submodule
+git submodule update --init --recursive
+```
+
+### Update Submodule ke Commit Terbaru
+
+```bash
+# Update satu submodule
+git submodule update --remote projects/qr-pdf-service
+
+# Update semua submodule sekaligus
+git submodule update --remote --merge
+
+# Commit pointer update di infra repo
+git add projects/qr-pdf-service
+git commit -m "chore: update qr-pdf-service submodule"
+git push
+```
+
+### Kerja di dalam Submodule
+
+```bash
+# Masuk ke direktori project
+cd projects/qr-pdf-service
+
+# Cek branch (submodule default: detached HEAD)
+git checkout main
+
+# Kerja seperti biasa — commit, push ke repo masing-masing
+git add .
+git commit -m "feat: ..."
+git push
+
+# Kembali ke infra repo dan update pointer
+cd ../..
+git add projects/qr-pdf-service
+git commit -m "chore: update qr-pdf-service submodule"
+git push
+```
+
+### Tambah Project Baru sebagai Submodule
+
+```bash
+git submodule add <remote-url> projects/<language>/<project-name>
+git commit -m "feat: add <project-name> as submodule"
+git push
+```
+
+### Hapus Submodule
+
+```bash
+git submodule deinit projects/<project-name>
+git rm projects/<project-name>
+git commit -m "chore: remove <project-name> submodule"
+```
+
+---
+
 ## 🔐 Security
 
 - Semua credentials di `.env` — **tidak pernah di-hardcode** di compose file
