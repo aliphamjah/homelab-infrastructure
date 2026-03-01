@@ -2,7 +2,7 @@
 
 > **Model:** Lenovo ThinkPad T14 Gen 2 | **WSL2 Ubuntu 22.04** | **Docker Engine 27.3.1**
 > **Source of truth:** https://www.notion.so/3164e3efc9fb81f3a0b3e45a0adbe847
-> **Last synced from Notion:** 2026-03-01
+> **Last synced from Notion:** 2026-03-02
 
 ---
 
@@ -61,8 +61,8 @@
 | Storage driver | overlay2 |
 | Data root | /var/lib/docker |
 | Idle memory | ~1.2GB |
-| Volume strategy | Named volumes (bukan bind mounts) |
-| Default container RAM | 2GB |
+| Volume strategy | Named volumes untuk data persisten |
+| Credentials | Semua dari `.env` — JANGAN hardcode di compose/scripts |
 
 **Docker Networks:**
 | Network | Subnet | Purpose |
@@ -80,11 +80,13 @@
 
 | Profile | Services | RAM | Command |
 |---------|----------|-----|---------|
-| **minimal** | PostgreSQL, Redis | ~4GB | `docker compose --profile minimal up -d` |
-| **backend** | + MongoDB, Kafka (1 broker) | ~8GB | `docker compose --profile backend up -d` |
-| **fullstack** | + Elasticsearch, Nginx, Kafka (2 broker) | ~14GB | `docker compose --profile fullstack up -d` |
+| **minimal** | PostgreSQL, Redis, pgAdmin, Redis Commander | ~4GB | `docker compose --profile minimal up -d` |
+| **backend** | + MongoDB, Kafka (KRaft), Mongo Express, Kafka UI | ~8GB | `docker compose --profile backend up -d` |
+| **fullstack** | + Elasticsearch, Kibana, Nginx | ~14GB | `docker compose --profile fullstack up -d` |
+| **monitoring** | Prometheus, Grafana, Node Exporter, cAdvisor | ~3GB | `docker compose --profile monitoring up -d` |
 | **kubernetes** | K3d (2-3 nodes) + registry + monitoring | ~12GB | `k3d cluster create dev-cluster --agents 2` |
-| **monitoring** | Prometheus, Grafana, exporters | ~3GB | `docker compose --profile monitoring up -d` |
+
+> **Kafka**: Berjalan dalam **KRaft mode** (combined broker+controller, tanpa Zookeeper) sejak 2026-03-02.
 
 ---
 
@@ -105,41 +107,45 @@
 ### Message Queues
 | Service | Port | Container |
 |---------|------|-----------|
-| Kafka broker 1 | **9092** | kafka-1 |
-| Kafka broker 2 | **9093** | kafka-2 |
-| Kafka broker 3 | **9094** | kafka-3 |
-| Zookeeper | **2181** | zookeeper |
-| Kafka UI | **8090** | kafka-ui |
+| Kafka (KRaft broker) | **9092** | dev-kafka |
+| Kafka UI | **8090** | dev-kafka-ui |
+
+> **Catatan:** Zookeeper (port 2181) sudah dihapus. Kafka kini pakai KRaft mode.
 
 ### Search & Analytics
 | Service | Port | Container |
 |---------|------|-----------|
-| Elasticsearch | **9200** | elasticsearch |
-| Elasticsearch transport | **9300** | elasticsearch |
-| Kibana | **5601** | kibana |
+| Elasticsearch | **9200** | dev-elasticsearch |
+| Elasticsearch transport | **9300** | dev-elasticsearch |
+| Kibana | **5601** | dev-kibana |
 
 ### Web & Proxy
 | Service | Port | Container |
 |---------|------|-----------|
-| Nginx HTTP | **80** | nginx |
-| Nginx HTTPS | **443** | nginx |
+| Nginx HTTP | **80** | dev-nginx |
+| Nginx HTTPS | **443** | dev-nginx |
 | Apache | **8080** | apache |
 
 ### Monitoring
 | Service | Port | Container |
 |---------|------|-----------|
-| Prometheus | **9090** | prometheus |
-| Grafana | **3002** | grafana |
-| Node Exporter | **9100** | node-exporter |
-| cAdvisor | **8085** | cadvisor |
+| Prometheus | **9090** | dev-prometheus |
+| Grafana | **3002** | dev-grafana |
+| Node Exporter | **9100** | dev-node-exporter |
+| cAdvisor | **8085** | dev-cadvisor |
 
 ### Dev Tools
 | Service | Port | Container |
 |---------|------|-----------|
-| pgAdmin | **5050** | pgadmin |
-| Mongo Express | **8081** | mongo-express |
-| Redis Commander | **8082** | redis-commander |
+| pgAdmin | **5050** | dev-pgadmin |
+| Mongo Express | **8081** | dev-mongo-express |
+| Redis Commander | **8082** | dev-redis-commander |
 | Jupyter | **8888** | jupyter |
+
+### Projects
+| Service | Port | Container |
+|---------|------|-----------|
+| QR PDF Service | **8250** | qr-pdf-service |
 
 ### Backend Services
 | Service | Port |
@@ -183,45 +189,94 @@
 
 ---
 
-## 📁 Project Structure
+## 📁 Project Structure (Aktual)
 
 ```
 /mnt/e/development/
-├── CLAUDE.md                    # ← File ini
+├── CLAUDE.md                        # ← File ini
 ├── README.md
-├── ARCHITECTURE.md
+├── MASTER.md
+├── QUICKREF.md
 ├── CHANGELOG.md
+├── .gitignore
 ├── infrastructure/
 │   ├── docker/
-│   │   ├── compose/             # databases.yml, kafka.yml, elasticsearch.yml,
-│   │   │                        # monitoring.yml, nginx.yml, dev-tools.yml
-│   │   ├── images/              # go-dev/, rust-dev/, node-dev/ Dockerfiles
-│   │   └── volumes/
-│   ├── kubernetes/
-│   │   ├── manifests/           # namespaces/, deployments/, services/,
-│   │   │                        # configmaps/, secrets/, ingress/
-│   │   └── helm/
-│   ├── scripts/
+│   │   ├── compose/
+│   │   │   ├── docker-compose.yml   # Single file, semua profiles
+│   │   │   ├── .env                 # GITIGNORED — credentials
+│   │   │   └── plane/               # Plane project management
+│   │   └── images/                  # Custom Dockerfiles (future)
+│   ├── scripts/                     # 11 scripts, semua portable (BASH_SOURCE)
 │   │   ├── start-lab.sh
 │   │   ├── stop-lab.sh
-│   │   ├── restart-lab.sh
 │   │   ├── status-lab.sh
-│   │   ├── backup.sh
-│   │   ├── restore.sh
+│   │   ├── health-check.sh
+│   │   ├── backup-databases.sh
+│   │   ├── maintenance.sh
 │   │   ├── cleanup.sh
-│   │   └── health-check.sh
-│   ├── configs/                 # nginx/, prometheus/, grafana/, kafka/
-│   └── secrets/                 # GITIGNORED
+│   │   ├── logs.sh
+│   │   ├── setup-cron.sh
+│   │   ├── test-all.sh
+│   │   └── test-workflow.sh
+│   ├── configs/
+│   │   └── prometheus/
+│   │       └── prometheus.yml       # Prometheus scrape config
+│   └── secrets/                     # GITIGNORED
+│       ├── .env.databases.example
+│       ├── .env.monitoring.example
+│       └── .env.qr-pdf-service
 ├── projects/
 │   ├── go/
 │   ├── rust/
 │   ├── typescript/
 │   ├── php/
-│   └── python/
-├── data/                        # GITIGNORED
+│   │   └── laravel-company-employee-management/
+│   ├── python/
+│   └── qr-pdf-service/              # Cloudflare Workers — repo terpisah
+│                                    # GitHub: aliphamjah/visitor-id-pdf-service
+├── data/                            # GITIGNORED — backups & DB dumps
 ├── docs/
 └── templates/
 ```
+
+---
+
+## 📦 Image Versions (Pinned — jangan ganti ke latest)
+
+| Service | Image | Version |
+|---------|-------|---------|
+| PostgreSQL | postgres | 16-alpine |
+| Redis | redis | 7-alpine |
+| pgAdmin | dpage/pgadmin4 | 8.14 |
+| Redis Commander | rediscommander/redis-commander | 0.8.0 |
+| MongoDB | mongo | 7.0 |
+| Mongo Express | mongo-express | 1.0.2 |
+| Kafka | confluentinc/cp-kafka | 7.7.0 |
+| Kafka UI | provectuslabs/kafka-ui | v0.7.2 |
+| Elasticsearch | elasticsearch | 8.11.0 |
+| Kibana | kibana | 8.11.0 |
+| Nginx | nginx | 1.27-alpine |
+| Prometheus | prom/prometheus | v2.53.0 |
+| Grafana | grafana/grafana | 11.1.0 |
+| Node Exporter | prom/node-exporter | v1.8.1 |
+| cAdvisor | gcr.io/cadvisor/cadvisor | v0.49.1 |
+
+---
+
+## 🔐 DevOps Standards (Berlaku di repo ini)
+
+Aturan ini wajib diikuti saat menambah atau mengubah konfigurasi:
+
+1. **Credentials** — Semua dari `${ENV_VAR}` via `.env`. Tidak boleh hardcode di compose file, scripts, atau Dockerfile.
+2. **Image tags** — Selalu pin ke versi spesifik. Dilarang pakai `:latest`.
+3. **Resource limits** — Setiap container WAJIB punya `deploy.resources.limits` (memory + cpus).
+4. **Healthcheck** — Setiap stateful service (DB, broker) WAJIB punya healthcheck.
+5. **depends_on** — Gunakan `condition: service_healthy` bukan hanya nama service.
+6. **Scripts paths** — Gunakan `SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"`. Dilarang hardcode `/mnt/e/...`.
+7. **Credentials di scripts** — Source `.env` di awal script (`set -a; source "$ENV_FILE"; set +a`).
+8. **SSH keys** — Simpan di `~/.ssh/`, bukan di dalam direktori repo.
+9. **Dockerfile** — Wajib: `.dockerignore`, `npm ci` (bukan install), non-root user, `HEALTHCHECK`.
+10. **Network** — Assign service ke network yang sesuai. Dev services → `dev-network`, Kafka → `kafka-network`, monitoring → `monitoring-network`.
 
 ---
 
@@ -238,26 +293,16 @@
 
 ## 🔄 Sync Protocol
 
-File ini adalah **local mirror** dari Notion (single source of truth).
+File ini diupdate langsung saat ada perubahan infrastruktur, tidak lagi menunggu sync dari Notion.
 
 **Kapan update file ini:**
-- Setelah install service baru
-- Setelah ubah port atau config
+- Setelah install service baru (tambah ke port table + image versions)
+- Setelah ubah port atau image version
 - Setelah perubahan project structure signifikan
-- Minimal setiap 2 minggu untuk menjaga konsistensi
-
-**Cara update:**
-1. Beritahu perubahan ke Claude di claude.ai
-2. Claude update Notion via MCP
-3. Jalankan command berikut untuk re-sync CLAUDE.md:
-
-```bash
-# Cara mudah: minta Claude generate ulang CLAUDE.md yang updated
-# lalu replace file ini
-```
+- Setelah DevOps standards baru ditetapkan
 
 **Notion URL:** https://www.notion.so/3164e3efc9fb81f3a0b3e45a0adbe847
 
 ---
 
-*Last synced: 2026-03-01 | Source: Notion via Claude MCP*
+*Last updated: 2026-03-02 | Updated by: Claude Code — DevOps review & hardening session*
