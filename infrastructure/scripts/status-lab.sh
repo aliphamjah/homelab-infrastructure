@@ -1,7 +1,8 @@
 #!/bin/bash
 # Home Lab Status Script
 
-COMPOSE_DIR="/mnt/e/development/infrastructure/docker/compose"
+SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COMPOSE_DIR="$SCRIPTS_DIR/../docker/compose"
 cd "$COMPOSE_DIR"
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

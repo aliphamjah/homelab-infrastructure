@@ -7,7 +7,20 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-COMPOSE_DIR="/mnt/e/development/infrastructure/docker/compose"
+SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COMPOSE_DIR="$SCRIPTS_DIR/../docker/compose"
+
+# Load credentials dari .env
+ENV_FILE="$COMPOSE_DIR/.env"
+if [ -f "$ENV_FILE" ]; then
+    set -a
+    # shellcheck source=/dev/null
+    source "$ENV_FILE"
+    set +a
+else
+    echo -e "${RED}ERROR: .env file not found at $ENV_FILE${NC}"
+    exit 1
+fi
 
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${BLUE}🏥 Home Lab Health Check${NC}"
@@ -61,7 +74,7 @@ if [ "$RUNNING" -gt 0 ]; then
     
     # PostgreSQL
     if docker ps --format '{{.Names}}' | grep -q "dev-postgres"; then
-        if timeout 3 docker exec dev-postgres pg_isready -U postgres > /dev/null 2>&1; then
+        if timeout 3 docker exec dev-postgres pg_isready -U "${POSTGRES_USER}" > /dev/null 2>&1; then
             echo -e "  ${GREEN}✓ PostgreSQL responding${NC}"
         else
             echo -e "  ${YELLOW}⟳ PostgreSQL not ready yet${NC}"
@@ -70,7 +83,7 @@ if [ "$RUNNING" -gt 0 ]; then
     
     # Redis
     if docker ps --format '{{.Names}}' | grep -q "dev-redis"; then
-        if timeout 3 docker exec dev-redis redis-cli -a homelab_redis_2025 ping > /dev/null 2>&1; then
+        if timeout 3 docker exec dev-redis redis-cli -a "${REDIS_PASSWORD}" ping > /dev/null 2>&1; then
             echo -e "  ${GREEN}✓ Redis responding${NC}"
         else
             echo -e "  ${YELLOW}⟳ Redis not ready yet${NC}"
@@ -79,7 +92,7 @@ if [ "$RUNNING" -gt 0 ]; then
     
     # MongoDB
     if docker ps --format '{{.Names}}' | grep -q "dev-mongo"; then
-        if timeout 3 docker exec dev-mongo mongosh --quiet --eval "db.adminCommand('ping').ok" -u admin -p homelab_mongo_2025 --authenticationDatabase admin > /dev/null 2>&1; then
+        if timeout 3 docker exec dev-mongo mongosh --quiet --eval "db.adminCommand('ping').ok" -u "${MONGO_INITDB_ROOT_USERNAME}" -p "${MONGO_INITDB_ROOT_PASSWORD}" --authenticationDatabase admin > /dev/null 2>&1; then
             echo -e "  ${GREEN}✓ MongoDB responding${NC}"
         else
             echo -e "  ${YELLOW}⟳ MongoDB not ready yet${NC}"

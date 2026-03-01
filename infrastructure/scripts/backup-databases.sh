@@ -4,7 +4,22 @@
 
 set -e
 
-BACKUP_DIR="/mnt/e/development/data/backups"
+SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COMPOSE_DIR="$SCRIPTS_DIR/../docker/compose"
+
+# Load credentials dari .env
+ENV_FILE="$COMPOSE_DIR/.env"
+if [ -f "$ENV_FILE" ]; then
+    set -a
+    # shellcheck source=/dev/null
+    source "$ENV_FILE"
+    set +a
+else
+    echo "ERROR: .env file not found at $ENV_FILE"
+    exit 1
+fi
+
+BACKUP_DIR="$SCRIPTS_DIR/../../data/backups"
 DATE=$(date +%Y%m%d_%H%M%S)
 DAILY_DIR="$BACKUP_DIR/daily"
 WEEKLY_DIR="$BACKUP_DIR/weekly"
@@ -38,7 +53,7 @@ backup_postgresql() {
         
         BACKUP_FILE="$DAILY_DIR/postgres_${DATE}.sql"
         
-        docker exec dev-postgres pg_dumpall -U postgres > "$BACKUP_FILE"
+        docker exec dev-postgres pg_dumpall -U "${POSTGRES_USER}" > "$BACKUP_FILE"
         
         # Compress the backup
         gzip "$BACKUP_FILE"
@@ -57,7 +72,7 @@ backup_redis() {
         echo -e "${YELLOW}📊 Backing up Redis...${NC}"
         
         # Trigger Redis SAVE
-        docker exec dev-redis redis-cli -a homelab_redis_2025 SAVE > /dev/null 2>&1
+        docker exec dev-redis redis-cli -a "${REDIS_PASSWORD}" SAVE > /dev/null 2>&1
         
         BACKUP_FILE="$DAILY_DIR/redis_${DATE}.rdb"
         
@@ -83,8 +98,8 @@ backup_mongodb() {
         BACKUP_DIR_MONGO="$DAILY_DIR/mongo_${DATE}"
         
         docker exec dev-mongo mongodump \
-            --username admin \
-            --password homelab_mongo_2025 \
+            --username "${MONGO_INITDB_ROOT_USERNAME}" \
+            --password "${MONGO_INITDB_ROOT_PASSWORD}" \
             --authenticationDatabase admin \
             --out /tmp/backup > /dev/null 2>&1
         

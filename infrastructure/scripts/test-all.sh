@@ -8,6 +8,19 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
+SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COMPOSE_DIR="$SCRIPTS_DIR/../docker/compose"
+DATA_DIR="$SCRIPTS_DIR/../../data"
+
+# Load credentials
+ENV_FILE="$COMPOSE_DIR/.env"
+if [ -f "$ENV_FILE" ]; then
+    set -a
+    # shellcheck source=/dev/null
+    source "$ENV_FILE"
+    set +a
+fi
+
 PASS=0
 FAIL=0
 
@@ -91,14 +104,14 @@ echo ""
 echo -e "${YELLOW}6️⃣  Testing Service Connectivity...${NC}"
 
 # PostgreSQL
-if docker exec dev-postgres pg_isready -U postgres > /dev/null 2>&1; then
+if docker exec dev-postgres pg_isready -U "${POSTGRES_USER:-postgres}" > /dev/null 2>&1; then
     test_pass "PostgreSQL accepting connections"
 else
     test_fail "PostgreSQL not accepting connections"
 fi
 
 # Redis
-if docker exec dev-redis redis-cli -a homelab_redis_2025 PING 2>/dev/null | grep -q "PONG"; then
+if docker exec dev-redis redis-cli -a "${REDIS_PASSWORD}" PING 2>/dev/null | grep -q "PONG"; then
     test_pass "Redis responding to commands"
 else
     test_fail "Redis not responding"
@@ -123,7 +136,7 @@ echo ""
 echo -e "${YELLOW}8️⃣  Testing Data Persistence...${NC}"
 
 # Check PostgreSQL data
-TABLE_COUNT=$(docker exec dev-postgres psql -U postgres -d homelab -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public';" 2>/dev/null | xargs)
+TABLE_COUNT=$(docker exec dev-postgres psql -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-homelab}" -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public';" 2>/dev/null | xargs)
 if [ "$TABLE_COUNT" -gt 0 ]; then
     test_pass "PostgreSQL data persisted ($TABLE_COUNT tables)"
 else
@@ -131,7 +144,7 @@ else
 fi
 
 # Check Redis data
-KEY_COUNT=$(docker exec dev-redis redis-cli -a homelab_redis_2025 DBSIZE 2>/dev/null | xargs)
+KEY_COUNT=$(docker exec dev-redis redis-cli -a "${REDIS_PASSWORD}" DBSIZE 2>/dev/null | xargs)
 if [ "$KEY_COUNT" -gt 0 ]; then
     test_pass "Redis data persisted ($KEY_COUNT keys)"
 else
@@ -183,7 +196,7 @@ SCRIPTS=(
 )
 
 for script in "${SCRIPTS[@]}"; do
-    if [ -x "/mnt/e/development/infrastructure/scripts/$script" ]; then
+    if [ -x "$SCRIPTS_DIR/$script" ]; then
         test_pass "Script available: $script"
     else
         test_fail "Script missing or not executable: $script"
@@ -195,7 +208,7 @@ echo ""
 echo -e "${YELLOW}1️⃣1️⃣  Testing Backup System...${NC}"
 BACKUP_DIRS=("daily" "weekly" "monthly")
 for dir in "${BACKUP_DIRS[@]}"; do
-    if [ -d "/mnt/e/development/data/backups/$dir" ]; then
+    if [ -d "$DATA_DIR/backups/$dir" ]; then
         test_pass "Backup directory exists: $dir"
     else
         test_fail "Backup directory missing: $dir"
@@ -213,7 +226,7 @@ else
     test_fail "Memory usage high (${MEM_USED}%)"
 fi
 
-DISK_USED=$(df /mnt/e/development | tail -1 | awk '{print $5}' | sed 's/%//')
+DISK_USED=$(df "$SCRIPTS_DIR" | tail -1 | awk '{print $5}' | sed 's/%//')
 if [ "$DISK_USED" -lt 80 ]; then
     test_pass "Disk usage healthy (${DISK_USED}%)"
 else

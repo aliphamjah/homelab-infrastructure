@@ -26,6 +26,11 @@ CREDENTIALS.md
 id_rsa
 id_rsa.pub
 *.ppk
+# Named SSH keys (explicit — pattern matching tidak cukup)
+personal_github
+personal_github.pub
+github_homelab
+github_homelab.pub
 
 # ─────────────────────────────────────────────────────────────
 # DATA & DATABASES (Too large, not code)
@@ -91,7 +96,7 @@ $RECYCLE.BIN/
 *.iws
 
 # ─────────────────────────────────────────────────────────────
-# TEMPORARY FILES
+# TEMPORARY FILES & TEST OUTPUTS
 # ─────────────────────────────────────────────────────────────
 tmp/
 temp/
@@ -100,6 +105,8 @@ temp/
 *.swp
 *.swo
 *~
+test.pdf
+test-*.pdf
 
 # ─────────────────────────────────────────────────────────────
 # DEPENDENCIES (Too large, can be reinstalled)
