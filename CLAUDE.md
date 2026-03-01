@@ -305,4 +305,12 @@ File ini diupdate langsung saat ada perubahan infrastruktur, tidak lagi menunggu
 
 ---
 
-*Last updated: 2026-03-02 | Updated by: Claude Code — DevOps review & hardening session*
+## 📝 Changelog
+
+| Date | Change | By |
+|------|--------|----|
+| 2026-03-02 | Notion synced: Kafka KRaft direfleksikan di port table, Projects section (QR PDF Service 8250) ditambahkan, Project Structure diupdate ke single docker-compose.yml, duplicate sections dibersihkan | Claude via MCP |
+| 2026-03-02 | Notion instruksi fetch diupdate — CLAUDE.md auto-loaded, tidak perlu fetch Notion setiap sesi | Claude via MCP |
+| 2026-03-02 | Initial CLAUDE.md created — DevOps review & hardening session | Claude Code |
+
+*Last updated: 2026-03-02 | Updated by: Claude Code*
