@@ -1,170 +1,367 @@
 # 🏠 Home Lab Infrastructure
 
-> Personal development environment with Docker, WSL2, and automation scripts
+> Personal development environment — Docker + WSL2 + automation scripts
 
-[![Status](https://img.shields.io/badge/status-production-green)]()
-[![Platform](https://img.shields.io/badge/platform-WSL2%20%2B%20Windows%2011-blue)]()
+[![Platform](https://img.shields.io/badge/platform-WSL2%20Ubuntu%2022.04-blue)]()
 [![Docker](https://img.shields.io/badge/docker-27.3.1-blue)]()
+[![Compose](https://img.shields.io/badge/compose-v2.27.1-blue)]()
+[![Status](https://img.shields.io/badge/status-active-green)]()
 
 ---
 
 ## 📋 Overview
 
-This repository contains the complete infrastructure setup for my personal home lab running on:
-- **Hardware**: Lenovo ThinkPad T14 Gen 2 (AMD Ryzen 7 PRO 5850U, 32GB RAM, 1TB SSD)
-- **Host OS**: Windows 11 Pro
-- **Container Platform**: WSL2 (Ubuntu 22.04 LTS) + Docker Engine
-- **Services**: 13 containerized services with 3 workload profiles
+Infrastructure personal home lab yang berjalan di atas:
+
+- **Hardware**: Lenovo ThinkPad T14 Gen 2 — AMD Ryzen 7 PRO 5850U, 32GB RAM, 1TB NVMe
+- **Host OS**: Windows 11 Pro (corporate tools only)
+- **Dev env**: WSL2 Ubuntu 22.04 LTS + Docker Engine 27.3.1 (native, bukan Docker Desktop)
+- **Pendekatan**: Single `docker-compose.yml` dengan profile-based loading — start only what you need
 
 ---
 
-## 🚀 Quick Start
+## ⚡ Quick Start
 
-### Prerequisites
-- Windows 11 with WSL2 enabled
-- Ubuntu 22.04 LTS installed
-- Docker Engine (native in WSL2)
-
-### Installation
 ```bash
-# Clone repository
-git clone https://github.com/YOUR_USERNAME/homelab-infrastructure.git
+# Clone
+git clone git@github.com:aliphamjah/homelab-infrastructure.git
 cd homelab-infrastructure
 
-# Setup aliases
-cat infrastructure/scripts/aliases.sh >> ~/.bashrc
-source ~/.bashrc
+# Copy dan isi credentials
+cp infrastructure/secrets/.env.databases.example infrastructure/docker/compose/.env
+# Edit .env sesuai kebutuhan
 
+# Start profile minimal (PostgreSQL + Redis)
+docker compose -f infrastructure/docker/compose/docker-compose.yml --profile minimal up -d
+
+# Cek status
+docker compose -f infrastructure/docker/compose/docker-compose.yml ps
+```
+
+> **Tip:** Tambahkan alias di `~/.bashrc` agar tidak perlu ketik path panjang setiap saat.
+> ```bash
+> alias dc='docker compose -f /mnt/e/development/infrastructure/docker/compose/docker-compose.yml'
+> ```
+
+---
+
+## 🚀 Service Profiles
+
+Semua service dikelola via satu file compose dengan profiles. Prinsip: **mulai dari minimal, scale up sesuai kebutuhan.**
+
+| Profile | Services | RAM | Command |
+|---------|----------|-----|---------|
+| `minimal` | PostgreSQL, Redis, pgAdmin, Redis Commander | ~4GB | `dc --profile minimal up -d` |
+| `backend` | + MongoDB, Kafka (KRaft), Mongo Express, Kafka UI | ~8GB | `dc --profile backend up -d` |
+| `fullstack` | + Elasticsearch, Kibana, Nginx | ~14GB | `dc --profile fullstack up -d` |
+| `monitoring` | Prometheus, Grafana, Node Exporter, cAdvisor | ~3GB | `dc --profile monitoring up -d` |
+| `kubernetes` | K3d cluster (2-3 nodes) + registry | ~12GB | `k3d cluster create dev-cluster --agents 2` |
+
+> ⚠️ **RAM limit WSL2 = 20GB.** Jangan jalankan `fullstack` + `monitoring` + `kubernetes` sekaligus.
+
+---
+
+## 🔌 Port Reference
+
+### Databases
+| Service | Port |
+|---------|------|
+| PostgreSQL | 5432 |
+| MongoDB | 27017 |
+| Redis | 6379 |
+| MySQL | 3306 |
+
+### Message Queue
+| Service | Port |
+|---------|------|
+| Kafka (KRaft) | 9092 |
+| Kafka UI | 8090 |
+
+> Kafka berjalan dalam **KRaft mode** (tanpa Zookeeper) sejak 2026-03-01.
+
+### Web & Admin UI
+| Service | Port |
+|---------|------|
+| pgAdmin | 5050 |
+| Mongo Express | 8081 |
+| Redis Commander | 8082 |
+| Kibana | 5601 |
+| Grafana | 3002 |
+| Prometheus | 9090 |
+
+### Projects
+| Service | Port |
+|---------|------|
+| QR PDF Service | 8250 |
+| Plane (project mgmt) | 8300 |
+
+---
+
+## 📖 Use Cases & Manual Guide
+
+### 1. Backend API Development (Go / Node.js / Python)
+
+Setup yang dibutuhkan: PostgreSQL + Redis.
+
+```bash
 # Start minimal profile
-start-minimal
+dc --profile minimal up -d
+
+# Verifikasi koneksi
+docker exec dev-postgres psql -U $POSTGRES_USER -c "\l"
+docker exec dev-redis redis-cli ping
+
+# Stop setelah selesai
+dc --profile minimal down
+```
+
+**Connection strings:**
+```
+PostgreSQL : postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@localhost:5432/$POSTGRES_DB
+Redis      : redis://localhost:6379
 ```
 
 ---
 
-## 📚 Documentation
+### 2. Event-Driven / Microservices Development
 
-- **[MASTER.md](MASTER.md)** - Complete reference documentation
-- **[QUICKREF.md](QUICKREF.md)** - Quick command reference
-- **[CHANGELOG.md](CHANGELOG.md)** - Version history
-- **[TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** - Common issues & solutions
+Setup yang dibutuhkan: PostgreSQL + Redis + MongoDB + Kafka.
 
----
-
-## 🎯 Service Profiles
-
-### Minimal (4GB RAM)
 ```bash
-start-minimal
-```
-- PostgreSQL 16
-- Redis 7
-- pgAdmin, Redis Commander
+# Start backend profile
+dc --profile backend up -d
 
-### Backend (8GB RAM)
-```bash
-start-backend
-```
-Minimal + MongoDB, Kafka, Zookeeper, Admin UIs
+# Cek Kafka siap
+docker exec dev-kafka kafka-topics --bootstrap-server localhost:9092 --list
 
-### Fullstack (14GB RAM)
-```bash
-start-fullstack
+# Buat topic baru
+docker exec dev-kafka kafka-topics \
+  --bootstrap-server localhost:9092 \
+  --create --topic my-topic \
+  --partitions 3 --replication-factor 1
+
+# Monitor via Kafka UI
+open http://localhost:8090
+
+# Stop setelah selesai
+dc --profile backend down
 ```
-Backend + Elasticsearch, Kibana, Nginx
 
 ---
 
-## 🔧 Scripts & Aliases
+### 3. Full Stack Development (dengan Search)
 
-### Service Management
-- `start-minimal` - Start minimal profile
-- `start-backend` - Start backend profile
-- `start-fullstack` - Start fullstack profile
-- `stop-lab` - Stop all services (100% cleanup)
+Setup yang dibutuhkan: semua backend + Elasticsearch + Kibana + Nginx.
 
-### Monitoring
-- `lab-status` - Quick status check
-- `lab-health` - Detailed health check
-- `lab-logs` - View logs
+```bash
+# Start fullstack profile
+dc --profile fullstack up -d
 
-### Maintenance
-- `lab-cleanup` - Remove unused resources
-- `lab-backup` - Backup all databases
+# Verifikasi Elasticsearch
+curl http://localhost:9200/_cluster/health?pretty
 
-See [MASTER.md](MASTER.md) for complete list.
+# Buat index
+curl -X PUT http://localhost:9200/my-index \
+  -H 'Content-Type: application/json' \
+  -d '{"settings": {"number_of_shards": 1}}'
+
+# Monitor via Kibana
+open http://localhost:5601
+
+# Stop setelah selesai
+dc --profile fullstack down
+```
 
 ---
 
-## 📂 Project Structure
+### 4. Monitoring & Observability
+
+Bisa dijalankan bersama profile lain (standalone ~3GB).
+
+```bash
+# Start monitoring (bisa bersamaan dengan minimal/backend)
+dc --profile minimal up -d
+dc --profile monitoring up -d
+
+# Dashboard tersedia di:
+# Grafana   → http://localhost:3002  (admin / lihat .env)
+# Prometheus → http://localhost:9090
+
+# Cek metrics terkumpul
+curl http://localhost:9090/api/v1/targets | jq '.data.activeTargets[].health'
+
+# Stop monitoring saja
+dc --profile monitoring down
 ```
-.
+
+---
+
+### 5. Database Admin via Web UI
+
+```bash
+# pgAdmin (PostgreSQL)
+open http://localhost:5050
+# Login: lihat .env → PGADMIN_EMAIL, PGADMIN_PASSWORD
+
+# Mongo Express (MongoDB)
+open http://localhost:8081
+# Basic auth: lihat .env → ME_BASICAUTH_USERNAME, ME_BASICAUTH_PASSWORD
+
+# Redis Commander
+open http://localhost:8082
+```
+
+---
+
+### 6. Database Backup
+
+```bash
+# Backup semua database sekaligus
+bash infrastructure/scripts/backup-databases.sh
+
+# Backup tersimpan di: data/backups/YYYY-MM-DD/
+```
+
+---
+
+### 7. Kubernetes Development (K3d)
+
+```bash
+# Buat cluster (butuh ~12GB RAM, jangan bersamaan dengan fullstack)
+k3d cluster create dev-cluster --agents 2 \
+  --port "30080:80@loadbalancer" \
+  --port "30443:443@loadbalancer"
+
+# Verifikasi
+kubectl get nodes
+kubectl get pods -A
+
+# Deploy aplikasi
+kubectl apply -f projects/go/k8s/
+
+# Hapus cluster setelah selesai
+k3d cluster delete dev-cluster
+```
+
+---
+
+### 8. Health Check & Troubleshooting
+
+```bash
+# Cek status semua container
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+# Health check lengkap
+bash infrastructure/scripts/health-check.sh
+
+# Lihat logs service tertentu
+docker logs dev-postgres --tail 50 -f
+docker logs dev-kafka --tail 50 -f
+
+# Restart service yang bermasalah
+docker restart dev-postgres
+
+# Cek resource usage
+docker stats --no-stream
+```
+
+---
+
+### 9. Cleanup & Maintenance
+
+```bash
+# Stop semua service (data tetap aman di volumes)
+dc down
+
+# Bersihkan resource tidak terpakai (images, networks, build cache)
+bash infrastructure/scripts/cleanup.sh
+
+# Maintenance rutin (cek disk, prune, report)
+bash infrastructure/scripts/maintenance.sh
+
+# Lihat ukuran volumes
+docker system df -v
+```
+
+---
+
+## 📁 Project Structure
+
+```
+/mnt/e/development/
+├── CLAUDE.md                        # Context untuk Claude AI
+├── README.md                        # File ini
 ├── infrastructure/
 │   ├── docker/
-│   │   ├── compose/          # Docker Compose files
-│   │   └── images/           # Custom Dockerfiles
-│   ├── scripts/              # Automation scripts (11 scripts)
-│   ├── configs/              # Service configurations
-│   └── secrets/              # Secrets (gitignored)
-├── projects/                 # Source code projects
-├── docs/                     # Extended documentation
-├── templates/                # Project templates
-├── MASTER.md                 # Master reference doc
-├── QUICKREF.md               # Quick reference
-└── CHANGELOG.md              # Version history
+│   │   ├── compose/
+│   │   │   ├── docker-compose.yml   # Single file, semua profiles
+│   │   │   ├── .env                 # GITIGNORED — credentials
+│   │   │   └── plane/               # Plane project management
+│   │   └── images/                  # Custom Dockerfiles
+│   ├── scripts/                     # 11 automation scripts
+│   │   ├── start-lab.sh
+│   │   ├── stop-lab.sh
+│   │   ├── status-lab.sh
+│   │   ├── health-check.sh
+│   │   ├── backup-databases.sh
+│   │   ├── maintenance.sh
+│   │   ├── cleanup.sh
+│   │   ├── logs.sh
+│   │   ├── setup-cron.sh
+│   │   ├── test-all.sh
+│   │   └── test-workflow.sh
+│   ├── configs/
+│   │   └── prometheus/
+│   │       └── prometheus.yml
+│   └── secrets/                     # GITIGNORED
+│       ├── .env.databases.example
+│       └── .env.monitoring.example
+├── projects/
+│   ├── go/
+│   ├── rust/
+│   ├── typescript/
+│   ├── php/
+│   │   └── laravel-company-employee-management/
+│   ├── python/
+│   └── qr-pdf-service/
+├── data/                            # GITIGNORED — backups & dumps
+├── docs/
+└── templates/
 ```
 
 ---
 
-## 🔐 Security Notes
+## 🔐 Security
 
-- All secrets are gitignored (see `.gitignore`)
-- Credentials stored locally in `CREDENTIALS.md` (not in repo)
-- Private repository recommended
-- Use SSH keys for Git authentication
+- Semua credentials di `.env` — **tidak pernah di-hardcode** di compose file
+- `.env` dan `secrets/` masuk `.gitignore`
+- SSH keys di `~/.ssh/`, bukan di dalam repo
+- Mongo Express dilindungi basic auth
+- Container berjalan sebagai non-root user (Dockerfile hardened)
 
 ---
 
 ## 📊 System Status
 
-**Last Updated**: 2025-10-28
+**Last Updated**: 2026-03-02
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Scripts | ✅ Operational | 11/11 working (100% reliability) |
-| Services | ✅ Operational | All profiles tested |
-| Memory | ✅ Optimal | 740Mi idle / 19Gi total |
-| Cleanup | ✅ Verified | 0 containers after stop |
-
----
-
-## 🛠️ Maintenance
-
-### Daily
-- Start/stop services as needed
-- Check status: `lab-status`
-
-### Weekly
-- Run cleanup: `lab-cleanup`
-- Check disk space: `df -h`
-
-### Monthly
-- Full maintenance: `maintenance.sh`
-- Backup databases: `lab-backup`
-- Update images (if needed)
-
----
-
-## 📝 License
-
-Private - Personal Use Only
+| PostgreSQL | ✅ | Port 5432, profile: minimal |
+| Redis | ✅ | Port 6379, profile: minimal |
+| MongoDB | ✅ | Port 27017, profile: backend |
+| Kafka | ✅ | Port 9092, **KRaft mode** (no Zookeeper) |
+| Elasticsearch | ✅ | Port 9200, profile: fullstack |
+| Monitoring stack | ✅ | Prometheus + Grafana + exporters |
+| Scripts | ✅ | 11/11 scripts, portable (BASH_SOURCE) |
 
 ---
 
 ## 👤 Author
 
-**Your Name**
-- GitHub: [@YOUR_USERNAME](https://github.com/YOUR_USERNAME)
+**Alip Hamjah**
+- GitHub: [@aliphamjah](https://github.com/aliphamjah)
 
 ---
 
-**Last Updated**: October 28, 2025
+*Private — Personal Use Only*
