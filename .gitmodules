@@ -1,0 +1,6 @@
+[submodule "projects/php/laravel-company-employee-management"]
+	path = projects/php/laravel-company-employee-management
+	url = https://gitlab.com/aliphamjah/laravel-company-employee-management.git
+[submodule "projects/qr-pdf-service"]
+	path = projects/qr-pdf-service
+	url = git@github.com:aliphamjah/visitor-id-pdf-service.git

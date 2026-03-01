@@ -1,0 +1,21 @@
+version: '3.8'
+
+# Plane Project Management - Self-Hosted
+# Architecture: Multi-container orchestration
+# Services: postgres, redis, minio, api, web, worker, beat-worker
+
+networks:
+  plane-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.24.0.0/16
+          gateway: 172.24.0.1
+
+volumes:
+  plane-postgres-data:
+    driver: local
+  plane-redis-data:
+    driver: local
+  plane-minio-data:
+    driver: local
